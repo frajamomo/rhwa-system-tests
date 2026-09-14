@@ -2,6 +2,7 @@ package inittools
 
 import (
 	"flag"
+	"fmt"
 	"os"
 
 	"github.com/go-logr/logr"
@@ -61,29 +62,21 @@ func init() {
 		klog.Exitf("can not load ApiClient. Please check your KUBECONFIG env var")
 	}
 
-	if EventsClient = newEventsClient(APIClient.Config); EventsClient == nil {
-		klog.Exitf("can not build high-QPS events client from ApiClient config")
+	var eventsErr error
+	if EventsClient, eventsErr = newEventsClient(APIClient.Config); eventsErr != nil {
+		klog.Exitf("can not build high-QPS events client: %v", eventsErr)
 	}
 }
 
 // newEventsClient builds a clientset from a copy of cfg with raised QPS/Burst.
-// Returns nil on error so init can fail loudly rather than hand back a client
-// that silently keeps the default limits.
-func newEventsClient(cfg *rest.Config) kubernetes.Interface {
+func newEventsClient(cfg *rest.Config) (kubernetes.Interface, error) {
 	if cfg == nil {
-		return nil
+		return nil, fmt.Errorf("REST config is nil")
 	}
 
 	throttled := rest.CopyConfig(cfg)
 	throttled.QPS = eventsClientQPS
 	throttled.Burst = eventsClientBurst
 
-	clientset, err := kubernetes.NewForConfig(throttled)
-	if err != nil {
-		klog.V(100).Infof("failed to build events client: %v", err)
-
-		return nil
-	}
-
-	return clientset
+	return kubernetes.NewForConfig(throttled)
 }
