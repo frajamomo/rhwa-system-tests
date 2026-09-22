@@ -196,9 +196,14 @@ var _ = Describe(
 
 			By("Creating StorageBasedRemediationConfig with detectOnlyMode: Enabled")
 
+			// Minimum sbrTimeoutSeconds (heartbeat = timeout/2) so a peer marks the
+			// storage-isolated node SBRStorageUnhealthy=True after ~MaxConsecutiveFailures
+			// heartbeats well within StorageInjectionTimeout. The default (30s) leaves too
+			// thin a margin under the injection wait and makes the test flaky.
 			detectOnlySBRC = buildSBRC(sbrparams.SBRCDetectOnlyTestName, map[string]interface{}{
 				"detectOnlyMode":     "Enabled",
 				"sharedStorageClass": rwxStorageClass,
+				"sbrTimeoutSeconds":  int64(sbrparams.SBRCTimeoutSecondsMin),
 			})
 
 			createErr := APIClient.Create(context.TODO(), detectOnlySBRC)
