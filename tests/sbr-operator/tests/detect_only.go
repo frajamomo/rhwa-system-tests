@@ -108,7 +108,12 @@ var _ = Describe(
 
 			Expect(workerNodes).ToNot(BeEmpty(), "No schedulable worker nodes found")
 
-			targetNodeName = workerNodes[0]
+			// Inject storage faults on a node that does not run the SBR controller: blocking
+			// CephFS on the controller's own node prevents the SBRStorageUnhealthy condition
+			// from being reported, so the test would time out waiting for it.
+			targetNodeName = pickTargetWorkerNode()
+			Expect(targetNodeName).ToNot(BeEmpty(),
+				"No schedulable worker node without an SBR controller pod found")
 			injectorPodName = "sbr-detect-only-injector-" + strings.Map(func(r rune) rune {
 				if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' {
 					return r
