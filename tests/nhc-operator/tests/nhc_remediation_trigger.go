@@ -426,13 +426,11 @@ var _ = Describe("NHC Functional -- Remediation Trigger and CR Lifecycle",
 				// pods when kubelet is stopped).
 				By("Starting kubelet via SSH to recover node (best-effort)")
 
-				// Best-effort SSH kubelet restart; if the AWS Nitro watchdog has
-				// already rebooted the node the SSH lands mid-reboot ("Connection
-				// timed out during banner exchange"). kubelet auto-starts on boot,
-				// so the waitForNHCPhase + WaitForNodeReady gates below are the real
-				// recovery checks. MUST NOT use Expect here -- matches the
-				// best-effort convention used by this suite's JustAfterEach cleanups.
-				if sshErr := startKubeletForRemediation(ctx, targetWorkerName); sshErr != nil {
+				// TestRemediation has no controller, so nothing reboots the node.
+				// Retry SSH unmask/start (same pattern as EnableKubeletSSH).
+				// MUST NOT use Expect on SSH: waitForNHCPhase + WaitForNodeReady below
+				// are the recovery gates.
+				if sshErr := startKubeletForRemediationRetrying(ctx, targetWorkerName); sshErr != nil {
 					GinkgoWriter.Printf(
 						"WARNING: SSH kubelet restart failed for %s (best-effort): %v\n",
 						targetWorkerName, sshErr)

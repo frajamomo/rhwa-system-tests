@@ -175,14 +175,12 @@ var _ = Describe("NHC Template Management -- Custom Remediation",
 				logNHCControllerState()
 			}
 
-			cleanupNHCCR(ctx, nhcparams.NHCCustomTemplateTestName)
-
 			if targetWorkerName == "" {
 				return
 			}
 
 			if isSSHAvailable() {
-				if sshErr := startKubeletForRemediation(ctx, targetWorkerName); sshErr != nil {
+				if sshErr := startKubeletForRemediationRetrying(ctx, targetWorkerName); sshErr != nil {
 					GinkgoWriter.Printf(
 						"WARNING: SSH kubelet restart failed for %s: %v\n",
 						targetWorkerName, sshErr)
@@ -204,6 +202,8 @@ var _ = Describe("NHC Template Management -- Custom Remediation",
 				AddReportEntry("safety-net-recovery-failed",
 					fmt.Sprintf("node %s did not recover: %v", targetWorkerName, err))
 			}
+
+			cleanupNHCCR(ctx, nhcparams.NHCCustomTemplateTestName)
 		})
 
 		It("Verifying NHC triggers remediation with custom TestRemediationTemplate (TRT)",
@@ -264,14 +264,11 @@ var _ = Describe("NHC Template Management -- Custom Remediation",
 
 				By("Starting kubelet to recover the node (best-effort)")
 
-				// Best-effort SSH kubelet restart. If the AWS Nitro hardware
-				// watchdog has already rebooted the node (it fires ~60-90s after
-				// kubelet stops heartbeating), the SSH lands mid-reboot and fails
-				// with "Connection timed out during banner exchange". That is
-				// expected and harmless: kubelet auto-starts on boot, so the
-				// WaitForNodeReady gate below is the real recovery check. MUST NOT
-				// use Expect here (matches the JustAfterEach and the other NHC specs).
-				if sshErr := startKubeletForRemediation(ctx, targetWorkerName); sshErr != nil {
+				// TestRemediation has no controller, so nothing reboots the node.
+				// Retry SSH unmask/start (same pattern as EnableKubeletSSH) because a
+				// single banner-exchange flake would leave kubelet runtime-masked.
+				// MUST NOT use Expect on SSH: WaitForNodeReady below is the recovery gate.
+				if sshErr := startKubeletForRemediationRetrying(ctx, targetWorkerName); sshErr != nil {
 					GinkgoWriter.Printf(
 						"WARNING: SSH kubelet restart failed for %s: %v\n",
 						targetWorkerName, sshErr)

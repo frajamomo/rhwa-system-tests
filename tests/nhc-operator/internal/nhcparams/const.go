@@ -65,6 +65,10 @@ const (
 	// oc debug cannot schedule pods when kubelet is stopped.
 	SSHTimeout = 30 * time.Second
 
+	// SSHRetryTimeout is how long to retry kubelet unmask/start via SSH while a
+	// node may be mid-reboot. Same budget EnableKubeletSSH uses in escalation tests.
+	SSHRetryTimeout = 5 * time.Minute
+
 	// UnhealthyConditionDuration is the standard NHC detection duration.
 	UnhealthyConditionDuration = "30s"
 

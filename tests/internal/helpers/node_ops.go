@@ -544,6 +544,56 @@ func StartKubeletSSH(
 	return runSSH(ctx, nodeIP, timeout, "sudo systemctl start kubelet")
 }
 
+// StartKubeletSSHWithRetry unmasks and starts kubelet via SSH, retrying while
+// the node may be mid-reboot. Mirrors EnableKubeletSSH; use this when the
+// remediator does not reboot the node (runtime mask from StopKubeletSSH stays
+// until unmask succeeds). timeout is the overall retry budget.
+func StartKubeletSSHWithRetry(
+	ctx context.Context, k8sClient client.Client,
+	nodeName string, retryTimeout time.Duration,
+	logf func(string, ...interface{}),
+) error {
+	if logf == nil {
+		logf = func(string, ...interface{}) {}
+	}
+
+	nodeIP, err := GetNodeInternalIP(ctx, k8sClient, nodeName)
+	if err != nil {
+		return err
+	}
+
+	const (
+		sshAttemptTimeout = 15 * time.Second
+		sshRetryInterval  = 5 * time.Second
+	)
+
+	return wait.PollUntilContextTimeout(ctx, sshRetryInterval, retryTimeout, true,
+		func(ctx context.Context) (bool, error) {
+			if sshErr := runSSH(ctx, nodeIP, sshAttemptTimeout, "sudo systemctl unmask --runtime kubelet"); sshErr != nil {
+				logf("StartKubeletSSHWithRetry(%s): unmask attempt failed (may be mid-reboot): %v\n",
+					nodeName, sshErr)
+
+				return false, nil
+			}
+
+			if sshErr := runSSH(ctx, nodeIP, sshAttemptTimeout, "sudo systemctl daemon-reload"); sshErr != nil {
+				logf("StartKubeletSSHWithRetry(%s): daemon-reload failed: %v\n", nodeName, sshErr)
+
+				return false, nil
+			}
+
+			if sshErr := runSSH(ctx, nodeIP, sshAttemptTimeout, "sudo systemctl start kubelet"); sshErr != nil {
+				logf("StartKubeletSSHWithRetry(%s): start attempt failed: %v\n", nodeName, sshErr)
+
+				return false, nil
+			}
+
+			logf("StartKubeletSSHWithRetry(%s): kubelet unmasked and started\n", nodeName)
+
+			return true, nil
+		})
+}
+
 // DisableKubeletSSH disables and stops kubelet on the target node via SSH.
 // Unlike StopKubeletSSH, kubelet will NOT restart after a node reboot.
 // Used by NHC escalation tests where the node must remain unhealthy
