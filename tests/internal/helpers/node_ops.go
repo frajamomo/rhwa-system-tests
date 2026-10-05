@@ -569,23 +569,17 @@ func StartKubeletSSHWithRetry(
 
 	return wait.PollUntilContextTimeout(ctx, sshRetryInterval, retryTimeout, true,
 		func(ctx context.Context) (bool, error) {
-			if sshErr := runSSH(ctx, nodeIP, sshAttemptTimeout, "sudo systemctl unmask --runtime kubelet"); sshErr != nil {
-				logf("StartKubeletSSHWithRetry(%s): unmask attempt failed (may be mid-reboot): %v\n",
-					nodeName, sshErr)
+			for _, cmd := range []string{
+				"sudo systemctl unmask --runtime kubelet",
+				"sudo systemctl daemon-reload",
+				"sudo systemctl start kubelet",
+			} {
+				if sshErr := runSSH(ctx, nodeIP, sshAttemptTimeout, cmd); sshErr != nil {
+					logf("StartKubeletSSHWithRetry(%s): %q failed (may be mid-reboot): %v\n",
+						nodeName, cmd, sshErr)
 
-				return false, nil
-			}
-
-			if sshErr := runSSH(ctx, nodeIP, sshAttemptTimeout, "sudo systemctl daemon-reload"); sshErr != nil {
-				logf("StartKubeletSSHWithRetry(%s): daemon-reload failed: %v\n", nodeName, sshErr)
-
-				return false, nil
-			}
-
-			if sshErr := runSSH(ctx, nodeIP, sshAttemptTimeout, "sudo systemctl start kubelet"); sshErr != nil {
-				logf("StartKubeletSSHWithRetry(%s): start attempt failed: %v\n", nodeName, sshErr)
-
-				return false, nil
+					return false, nil
+				}
 			}
 
 			logf("StartKubeletSSHWithRetry(%s): kubelet unmasked and started\n", nodeName)

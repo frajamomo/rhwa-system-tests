@@ -421,13 +421,9 @@ var _ = Describe("NHC Functional -- Remediation Trigger and CR Lifecycle",
 
 				GinkgoWriter.Println("SNR CR not created -- one-at-a-time constraint verified")
 
-				// TestRemediation has no controller, so the node stays unhealthy.
-				// Restart kubelet via SSH to recover (oc debug can't schedule
-				// pods when kubelet is stopped).
 				By("Starting kubelet via SSH to recover node (best-effort)")
 
-				// TestRemediation has no controller, so nothing reboots the node.
-				// Retry SSH unmask/start (same pattern as EnableKubeletSSH).
+				// TestRemediation does not reboot; retry unmask/start like EnableKubeletSSH.
 				// MUST NOT use Expect on SSH: waitForNHCPhase + WaitForNodeReady below
 				// are the recovery gates.
 				if sshErr := startKubeletForRemediationRetrying(ctx, targetWorkerName); sshErr != nil {
