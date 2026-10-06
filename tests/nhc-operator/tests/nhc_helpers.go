@@ -245,11 +245,12 @@ func startKubeletForRemediation(ctx context.Context, nodeName string) error {
 }
 
 // startKubeletForRemediationRetrying retries unmask/start like EnableKubeletSSH.
-// Used by TestRemediation specs: that dummy remediator does not reboot, so a
-// single banner-exchange failure would leave kubelet runtime-masked.
+// Used by TestRemediation specs: that dummy remediator does not reboot, so the
+// runtime mask stays until unmask succeeds. Uses NodeReadyTimeout so SSH is not
+// abandoned while WaitForNodeReady is still allowed to run.
 func startKubeletForRemediationRetrying(ctx context.Context, nodeName string) error {
 	return helpers.StartKubeletSSHWithRetry(
-		ctx, APIClient, nodeName, nhcparams.SSHRetryTimeout, GinkgoWriter.Printf)
+		ctx, APIClient, nodeName, nhcparams.NodeReadyTimeout, GinkgoWriter.Printf)
 }
 
 // isSSHAvailable returns true if an SSH key can be found.
