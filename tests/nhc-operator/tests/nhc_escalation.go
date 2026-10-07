@@ -251,11 +251,11 @@ var _ = Describe("NHC Escalation -- Functional E2E",
 				labels.ComponentRemediation), func() {
 				nhcName := nhcparams.NHCEscalationTestName + "-stops"
 
-				By("Creating NHC with escalation: SNR first (order=0), TestRemediation second (order=1, timeout=600s)")
+				By("Creating NHC with escalation: SNR first (order=0, timeout=600s), TestRemediation second (order=1, timeout=60s)")
 
 				nhc := buildNHCWithEscalation(nhcName, []escalationStep{
-					snrEscalationStep(0, nhcparams.EscalationSNRStepTimeout),
-					testRemediationEscalationStep(1, nhcparams.EscalationLongTimeout),
+					snrEscalationStep(0, nhcparams.EscalationLongTimeout),
+					testRemediationEscalationStep(1, nhcparams.EscalationFirstStepTimeout),
 				})
 				Expect(APIClient.Create(ctx, nhc)).To(Succeed())
 				DeferCleanup(func() { cleanupNHCCR(ctx, nhcName) })
