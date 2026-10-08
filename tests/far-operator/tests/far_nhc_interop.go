@@ -241,7 +241,7 @@ var _ = Describe("NHC+FAR Interop",
 				nhcState.targetNode = ""
 
 				if kubeletStopAttempted {
-					By("Cleanup: unmasking and restarting kubelet on " + nodeName)
+					By("Cleanup: restarting kubelet on " + nodeName)
 					startKubeletAfterRemediation(ctx, nodeName)
 					kubeletStopAttempted = false
 				}

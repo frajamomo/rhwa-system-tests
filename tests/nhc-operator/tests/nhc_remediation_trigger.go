@@ -423,7 +423,7 @@ var _ = Describe("NHC Functional -- Remediation Trigger and CR Lifecycle",
 
 				By("Starting kubelet via SSH to recover node (best-effort)")
 
-				// TestRemediation does not reboot; retry unmask/start like EnableKubeletSSH.
+				// TestRemediation does not reboot; retry start like EnableKubeletSSH.
 				// MUST NOT use Expect on SSH: waitForNHCPhase + WaitForNodeReady below
 				// are the recovery gates.
 				if sshErr := startKubeletForRemediationRetrying(ctx, targetWorkerName); sshErr != nil {

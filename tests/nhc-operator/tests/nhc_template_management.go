@@ -264,7 +264,7 @@ var _ = Describe("NHC Template Management -- Custom Remediation",
 
 				By("Starting kubelet to recover the node (best-effort)")
 
-				// TestRemediation does not reboot; retry unmask/start like EnableKubeletSSH.
+				// TestRemediation does not reboot; retry start like EnableKubeletSSH.
 				// MUST NOT use Expect on SSH: WaitForNodeReady below is the recovery gate.
 				if sshErr := startKubeletForRemediationRetrying(ctx, targetWorkerName); sshErr != nil {
 					GinkgoWriter.Printf(
