@@ -2,7 +2,6 @@ package farutils
 
 import (
 	"fmt"
-	"reflect"
 	"strconv"
 
 	"github.com/medik8s/system-tests/tests/internal/helpers"
@@ -13,22 +12,6 @@ import (
 
 // TemplateValidationCondition identifies the controller's fence-agent status probe.
 const TemplateValidationCondition = "FenceAgentStatusValidationSucceeded"
-
-// VerifyConfiguration requires the original template identity and complete defaulted spec.
-func VerifyConfiguration(object *unstructured.Unstructured, uid types.UID, spec map[string]interface{}) error {
-	if uid == "" || object.GetUID() != uid {
-		return fmt.Errorf("FAR template UID changed: expected %s, got %s", uid, object.GetUID())
-	}
-	current, found, err := unstructured.NestedMap(object.Object, "spec")
-	if err != nil {
-		return err
-	}
-	if !found || !reflect.DeepEqual(current, spec) {
-		return fmt.Errorf("FAR template spec changed: expected %v, got %v", spec, current)
-	}
-
-	return nil
-}
 
 // FBCRemediationEnabled keeps destructive validation explicitly opt-in.
 func FBCRemediationEnabled(value string) (bool, error) {

@@ -1,6 +1,7 @@
 package farutils
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"testing"
@@ -60,12 +61,13 @@ func TestVerifyConfiguration(t *testing.T) {
 			if test.change != nil {
 				test.change(current)
 			}
-			if err := VerifyConfiguration(current, object.GetUID(), spec); (err != nil) != test.wantErr {
+			err := helpers.VerifyConfigurationPreserved(context.Background(), nil, current, object.GetUID(), spec)
+			if (err != nil) != test.wantErr {
 				t.Fatalf("unexpected preservation result: %v", err)
 			}
 		})
 	}
-	if err := VerifyConfiguration(object, "", spec); err == nil {
+	if err := helpers.VerifyConfigurationPreserved(context.Background(), nil, object, "", spec); err == nil {
 		t.Fatal("accepted a missing original UID")
 	}
 }

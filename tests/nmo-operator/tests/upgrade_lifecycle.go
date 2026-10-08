@@ -173,7 +173,7 @@ func (hooks *nmoUpgradeOperatorFBCTest) waitForMaintenance(
 		if err := APIClient.Get(ctx, client.ObjectKeyFromObject(hooks.config), hooks.config); err != nil {
 			return err
 		}
-		if err := nmoutils.VerifyConfiguration(hooks.config, hooks.configUID, spec); err != nil {
+		if err := helpers.VerifyConfigurationPreserved(ctx, APIClient, hooks.config, hooks.configUID, spec); err != nil {
 			return err
 		}
 		if err := nmoutils.VerifyMaintenance(hooks.config, since); err != nil {
@@ -192,7 +192,8 @@ func (hooks *nmoUpgradeOperatorFBCTest) reportConfiguration(ctx context.Context,
 	if err := APIClient.Get(ctx, client.ObjectKeyFromObject(hooks.config), hooks.config); err != nil {
 		return err
 	}
-	if err := nmoutils.VerifyConfiguration(hooks.config, hooks.configUID, hooks.configSpec); err != nil {
+	err := helpers.VerifyConfigurationPreserved(ctx, APIClient, hooks.config, hooks.configUID, hooks.configSpec)
+	if err != nil {
 		return err
 	}
 	AddReportEntry("nmo-upgrade-config-"+phase, map[string]interface{}{

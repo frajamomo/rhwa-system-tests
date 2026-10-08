@@ -140,7 +140,7 @@ func (hooks *sbrUpgradeOperatorFBCTest) AfterUpgrade(ctx context.Context) error 
 func (hooks *sbrUpgradeOperatorFBCTest) verifyConfiguration(ctx context.Context) {
 	object := upgradeSBRC()
 	Expect(APIClient.Get(ctx, client.ObjectKeyFromObject(object), object)).To(Succeed())
-	Expect(sbrutils.VerifyConfiguration(object, hooks.configUID, hooks.configSpec)).To(Succeed())
+	Expect(helpers.VerifyConfigurationPreserved(ctx, APIClient, object, hooks.configUID, hooks.configSpec)).To(Succeed())
 }
 
 func (hooks *sbrUpgradeOperatorFBCTest) patchConfiguration(ctx context.Context, spec map[string]interface{}) {

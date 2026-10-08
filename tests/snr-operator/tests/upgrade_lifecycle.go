@@ -9,7 +9,6 @@ import (
 	. "github.com/medik8s/system-tests/tests/internal/medik8sinittools"
 	"github.com/medik8s/system-tests/tests/internal/medik8sparams"
 	"github.com/medik8s/system-tests/tests/snr-operator/internal/snrparams"
-	"github.com/medik8s/system-tests/tests/snr-operator/internal/snrutils"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	configv1 "github.com/openshift/api/config/v1"
@@ -73,7 +72,7 @@ func (hooks *snrUpgradeOperatorFBCTest) BeforeUpgrade(ctx context.Context) error
 	if err != nil {
 		return err
 	}
-	Expect(snrutils.VerifyConfiguration(object, hooks.configUID, hooks.configSpec)).To(Succeed())
+	Expect(helpers.VerifyConfigurationPreserved(ctx, APIClient, object, hooks.configUID, hooks.configSpec)).To(Succeed())
 	baselineImage, err := hooks.controllerAgentImage(ctx)
 	if err != nil {
 		return err
@@ -123,7 +122,7 @@ func (hooks *snrUpgradeOperatorFBCTest) AfterUpgrade(ctx context.Context) error 
 func (hooks *snrUpgradeOperatorFBCTest) reportConfiguration(ctx context.Context, phase string) {
 	object := upgradeSNRC()
 	Expect(APIClient.Get(ctx, client.ObjectKeyFromObject(object), object)).To(Succeed())
-	Expect(snrutils.VerifyConfiguration(object, hooks.configUID, hooks.configSpec)).To(Succeed())
+	Expect(helpers.VerifyConfigurationPreserved(ctx, APIClient, object, hooks.configUID, hooks.configSpec)).To(Succeed())
 	AddReportEntry("snr-config-"+phase+"-operator-upgrade", map[string]interface{}{
 		"uid": hooks.configUID, "spec": hooks.configSpec,
 	})

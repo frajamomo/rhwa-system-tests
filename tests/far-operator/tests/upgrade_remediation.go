@@ -62,7 +62,9 @@ func (hooks *farUpgradeOperatorFBCTest) runRemediationCycle(ctx context.Context,
 		return err
 	}
 	Expect(APIClient.Get(ctx, client.ObjectKeyFromObject(hooks.template), hooks.template)).To(Succeed())
-	Expect(farutils.VerifyConfiguration(hooks.template, hooks.configUID, hooks.configSpec)).To(Succeed())
+	Expect(helpers.VerifyConfigurationPreserved(
+		ctx, APIClient, hooks.template, hooks.configUID, hooks.configSpec,
+	)).To(Succeed())
 	remediation, err := farutils.RemediationFromTemplate(hooks.template, node.Name, hooks.owned.Token)
 	if err != nil {
 		return err

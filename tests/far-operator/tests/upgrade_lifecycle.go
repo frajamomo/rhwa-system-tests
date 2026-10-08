@@ -166,7 +166,7 @@ func (hooks *farUpgradeOperatorFBCTest) AfterUpgrade(ctx context.Context) error 
 		if err := APIClient.Get(ctx, client.ObjectKeyFromObject(object), object); err != nil {
 			return err
 		}
-		if err := farutils.VerifyConfiguration(object, hooks.configUID, probeSpec); err != nil {
+		if err := helpers.VerifyConfigurationPreserved(ctx, APIClient, object, hooks.configUID, probeSpec); err != nil {
 			return err
 		}
 
@@ -209,7 +209,9 @@ func (hooks *farUpgradeOperatorFBCTest) AfterUpgrade(ctx context.Context) error 
 
 func (hooks *farUpgradeOperatorFBCTest) reportConfiguration(ctx context.Context, phase string) {
 	Expect(APIClient.Get(ctx, client.ObjectKeyFromObject(hooks.template), hooks.template)).To(Succeed())
-	Expect(farutils.VerifyConfiguration(hooks.template, hooks.configUID, hooks.configSpec)).To(Succeed())
+	Expect(helpers.VerifyConfigurationPreserved(
+		ctx, APIClient, hooks.template, hooks.configUID, hooks.configSpec,
+	)).To(Succeed())
 	AddReportEntry("far-config-"+phase+"-operator-upgrade", map[string]interface{}{
 		"uid": hooks.configUID, "spec": hooks.configSpec,
 	})

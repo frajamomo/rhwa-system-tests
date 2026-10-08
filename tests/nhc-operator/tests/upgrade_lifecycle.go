@@ -117,21 +117,24 @@ func (hooks *nhcUpgradeOperatorFBCTest) BeforeUpgrade(ctx context.Context) error
 func (hooks *nhcUpgradeOperatorFBCTest) AfterUpgrade(ctx context.Context) error {
 	By("verifying the same configuration identity, specification, and reconciliation")
 
-	uid, spec := captureNHCConfiguration(ctx)
-	if uid != hooks.configUID {
-		return fmt.Errorf("NodeHealthCheck UID changed from %s to %s", hooks.configUID, uid)
+	object := upgradeNHC()
+	if err := APIClient.Get(ctx, client.ObjectKeyFromObject(object), object); err != nil {
+		return err
 	}
-
-	Expect(spec).To(Equal(hooks.configSpec), "upgrade must preserve the NodeHealthCheck specification")
+	Expect(helpers.VerifyConfigurationPreserved(
+		ctx, APIClient, object, types.UID(hooks.configUID), hooks.configSpec,
+	)).To(Succeed())
 
 	By("requiring a fresh candidate-controller response to a unique pause request")
 	changeUpgradePause(ctx, types.UID(hooks.configUID), hooks.token+"-candidate")
 
 	By("restoring the original configuration and requiring another controller response")
 	changeUpgradePause(ctx, types.UID(hooks.configUID), hooks.token)
-	uid, spec = captureNHCConfiguration(ctx)
-	Expect(uid).To(Equal(hooks.configUID))
-	Expect(spec).To(Equal(hooks.configSpec))
+	Expect(APIClient.Get(ctx, client.ObjectKeyFromObject(object), object)).To(Succeed())
+	Expect(helpers.VerifyConfigurationPreserved(
+		ctx, APIClient, object, types.UID(hooks.configUID), hooks.configSpec,
+	)).To(Succeed())
+	uid, spec := captureNHCConfiguration(ctx)
 	AddReportEntry("nhc-config-after-operator-upgrade", map[string]interface{}{
 		"uid": uid, "spec": spec,
 	})

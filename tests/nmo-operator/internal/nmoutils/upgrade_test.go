@@ -1,6 +1,7 @@
 package nmoutils
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -48,7 +49,8 @@ func TestVerifyConfigurationAndOwnership(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			object := original.DeepCopy()
 			test.mutate(object)
-			if err := VerifyConfiguration(object, "original", spec); (err == nil) != test.valid {
+			err := helpers.VerifyConfigurationPreserved(context.Background(), nil, object, "original", spec)
+			if (err == nil) != test.valid {
 				t.Fatalf("VerifyConfiguration() = %v, want valid %t", err, test.valid)
 			}
 		})

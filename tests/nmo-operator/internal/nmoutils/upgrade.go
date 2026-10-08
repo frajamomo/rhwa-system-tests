@@ -2,7 +2,6 @@ package nmoutils
 
 import (
 	"fmt"
-	"reflect"
 	"time"
 
 	"github.com/medik8s/system-tests/tests/internal/helpers"
@@ -23,20 +22,6 @@ func VerifyOwned(object *unstructured.Unstructured, uid types.UID, token, nodeNa
 	}
 	if uid == "" || object.GetUID() != uid || object.GetLabels()[helpers.FBCRunLabel] != token || node != nodeName {
 		return fmt.Errorf("refusing mutation of unowned/replaced NodeMaintenance %s", object.GetName())
-	}
-
-	return nil
-}
-
-// VerifyConfiguration compares the original UID and complete persisted spec.
-func VerifyConfiguration(object *unstructured.Unstructured, uid types.UID, spec map[string]interface{}) error {
-	current, found, err := unstructured.NestedMap(object.Object, "spec")
-	if err != nil {
-		return err
-	}
-	if uid == "" || object.GetUID() != uid || object.GetDeletionTimestamp() != nil ||
-		!found || !reflect.DeepEqual(current, spec) {
-		return fmt.Errorf("NMO configuration was replaced, deleted, or changed: UID %s, spec %v", object.GetUID(), current)
 	}
 
 	return nil

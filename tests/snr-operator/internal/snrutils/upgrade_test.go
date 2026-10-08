@@ -1,6 +1,7 @@
 package snrutils
 
 import (
+	"context"
 	"testing"
 
 	"github.com/medik8s/system-tests/tests/internal/helpers"
@@ -78,12 +79,13 @@ func TestVerifyConfiguration(t *testing.T) {
 			if test.change != nil {
 				test.change(changed)
 			}
-			if err := VerifyConfiguration(changed, object.GetUID(), spec); (err != nil) != test.wantErr {
+			err := helpers.VerifyConfigurationPreserved(context.Background(), nil, changed, object.GetUID(), spec)
+			if (err != nil) != test.wantErr {
 				t.Fatalf("unexpected preservation result: %v", err)
 			}
 		})
 	}
-	if err := VerifyConfiguration(object, "", spec); err == nil {
+	if err := helpers.VerifyConfigurationPreserved(context.Background(), nil, object, "", spec); err == nil {
 		t.Fatal("accepted an absent baseline identity")
 	}
 }

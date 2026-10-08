@@ -88,7 +88,8 @@ func (hooks *mdrUpgradeOperatorFBCTest) reportConfiguration(ctx context.Context,
 	if err := APIClient.Get(ctx, client.ObjectKeyFromObject(hooks.template), hooks.template); err != nil {
 		return err
 	}
-	if err := mdrutils.VerifyConfiguration(hooks.template, hooks.configUID, hooks.configSpec); err != nil {
+	err := helpers.VerifyConfigurationPreserved(ctx, APIClient, hooks.template, hooks.configUID, hooks.configSpec)
+	if err != nil {
 		return err
 	}
 	AddReportEntry("mdr-upgrade-config-"+phase, map[string]interface{}{

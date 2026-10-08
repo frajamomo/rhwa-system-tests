@@ -2,29 +2,12 @@ package mdrutils
 
 import (
 	"fmt"
-	"reflect"
 
 	"github.com/medik8s/system-tests/tests/internal/helpers"
 	"github.com/medik8s/system-tests/tests/mdr-operator/internal/mdrparams"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 )
-
-// VerifyConfiguration checks identity and the full persisted template spec, including empty maps.
-func VerifyConfiguration(object *unstructured.Unstructured, uid types.UID, spec map[string]interface{}) error {
-	if uid == "" || object.GetUID() != uid {
-		return fmt.Errorf("MDR template UID changed: expected %s, got %s", uid, object.GetUID())
-	}
-	current, found, err := unstructured.NestedMap(object.Object, "spec")
-	if err != nil {
-		return err
-	}
-	if !found || !reflect.DeepEqual(current, spec) {
-		return fmt.Errorf("MDR template spec changed: expected %v, got %v", spec, current)
-	}
-
-	return nil
-}
 
 // SafeProbe copies the persisted template and blocks Machine deletion while the request is active.
 // NHC is not installed: its timeout annotation is a supported controller safety gate.

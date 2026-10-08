@@ -1,8 +1,10 @@
 package sbrutils
 
 import (
+	"context"
 	"testing"
 
+	"github.com/medik8s/system-tests/tests/internal/helpers"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -54,7 +56,8 @@ func TestVerifyConfiguration(t *testing.T) {
 				test.change(changed)
 			}
 
-			if err := VerifyConfiguration(changed, test.uid, spec); (err != nil) != test.wantErr {
+			err := helpers.VerifyConfigurationPreserved(context.Background(), nil, changed, test.uid, spec)
+			if (err != nil) != test.wantErr {
 				t.Fatalf("unexpected preservation result: %v", err)
 			}
 		})
