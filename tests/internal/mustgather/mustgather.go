@@ -95,6 +95,34 @@ func Run(
 	return nil
 }
 
+// ResolveImage returns the must-gather image to use: the value of the
+// envVar when set, otherwise defaultImage. The chosen source is logged so a
+// run's image provenance is visible in the test output.
+func ResolveImage(envVar, defaultImage string, logf func(format string, args ...interface{})) string {
+	if envImg := os.Getenv(envVar); envImg != "" {
+		logf("must-gather image resolved from %s env var: %s\n", envVar, envImg)
+
+		return envImg
+	}
+
+	logf("must-gather image using default: %s\n", defaultImage)
+
+	return defaultImage
+}
+
+// CreateDestDir creates a unique output directory for must-gather artifacts.
+// It roots the directory at ARTIFACT_DIR when set (so CI collects the output),
+// falling back to fallbackBase otherwise. prefix names the per-operator temp
+// directory. It returns the created directory and any error from MkdirTemp.
+func CreateDestDir(prefix, fallbackBase string) (string, error) {
+	base := os.Getenv("ARTIFACT_DIR")
+	if base == "" {
+		base = fallbackBase
+	}
+
+	return os.MkdirTemp(base, prefix)
+}
+
 // resolveImageDigest returns the manifest digest a mutable image reference
 // currently resolves to, so a run using a floating tag (e.g. :latest) can be
 // reproduced against the exact build that was pulled. Best-effort: callers log

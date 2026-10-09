@@ -2,11 +2,7 @@ package tests
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
-	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -23,6 +19,7 @@ import (
 	"github.com/medik8s/system-tests/tests/internal/labels"
 	. "github.com/medik8s/system-tests/tests/internal/medik8sinittools"
 	"github.com/medik8s/system-tests/tests/internal/medik8sparams"
+	"github.com/medik8s/system-tests/tests/internal/mustgather"
 	"github.com/medik8s/system-tests/tests/snr-operator/internal/snrparams"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -63,14 +60,15 @@ var _ = Describe(
 
 				By("Resolving the RHWA must-gather image")
 
-				mustGatherImage := resolveMustGatherImage()
+				mustGatherImage := mustgather.ResolveImage(
+					snrparams.MustGatherImageEnvVar, snrparams.DefaultMustGatherImage, GinkgoWriter.Printf)
 				Expect(mustGatherImage).To(ContainSubstring(":"),
 					"must-gather image %q should contain a tag separator", mustGatherImage)
-				GinkgoWriter.Printf("Using must-gather image: %s\n", mustGatherImage)
 
 				By("Creating artifact directory for must-gather output")
 
-				destDir := createMustGatherDestDir()
+				destDir, mkdirErr := mustgather.CreateDestDir("snr-must-gather-", GinkgoT().TempDir())
+				Expect(mkdirErr).ToNot(HaveOccurred(), "Failed to create must-gather output directory")
 
 				By("Capturing cluster state before must-gather for validation")
 
@@ -95,14 +93,21 @@ var _ = Describe(
 				defer cancel()
 
 				DeferCleanup(func() {
-					cleanupMustGatherNamespaces(context.Background(), testStartTime)
+					By("Cleaning up leftover must-gather namespaces")
+					mustgather.CleanupNamespaces(context.Background(), testStartTime,
+						snrparams.MustGatherCleanupTimeout, GinkgoWriter.Printf)
 				})
 
-				runMustGather(ctx, mustGatherImage, destDir)
+				Expect(mustgather.Run(ctx, mustGatherImage, destDir, mustgather.Options{
+					ImageInfoTimeout: snrparams.MustGatherImageInfoTimeout,
+					OCTimeout:        snrparams.MustGatherOCTimeout,
+					SaveCommandLog:   true,
+					HomeFallback:     true,
+				}, GinkgoWriter.Printf)).To(Succeed(), "oc adm must-gather failed")
 
 				By("Collecting gathered file paths")
 
-				collectedFiles, walkErr := collectRelativePaths(destDir)
+				collectedFiles, walkErr := mustgather.CollectRelativePaths(destDir)
 				Expect(walkErr).ToNot(HaveOccurred(), "Failed to walk must-gather output directory")
 				Expect(collectedFiles).ToNot(BeEmpty(), "No files collected by must-gather")
 
@@ -114,7 +119,7 @@ var _ = Describe(
 				By("Validating node YAMLs for all cluster nodes")
 
 				for _, nodeName := range nodeNames {
-					Expect(hasMatchingFile(collectedFiles, "nodes/"+nodeName+".yaml")).To(BeTrue(),
+					Expect(mustgather.HasMatchingFile(collectedFiles, "nodes/"+nodeName+".yaml")).To(BeTrue(),
 						"must-gather should contain YAML for node %s", nodeName)
 				}
 
@@ -123,14 +128,14 @@ var _ = Describe(
 				By("Validating SNR CRD definitions are present")
 
 				for _, crdName := range snrparams.SNRCRDNames {
-					Expect(hasMatchingFile(collectedFiles, crdName+".yaml")).To(BeTrue(),
+					Expect(mustgather.HasMatchingFile(collectedFiles, crdName+".yaml")).To(BeTrue(),
 						"must-gather should contain CRD definition for %s", crdName)
 				}
 
 				By("Validating SNR controller and agent pod data is collected")
 
 				for _, podName := range snrPodNames {
-					Expect(hasMatchingFile(collectedFiles, podName)).To(BeTrue(),
+					Expect(mustgather.HasMatchingFile(collectedFiles, podName)).To(BeTrue(),
 						"must-gather should contain data for SNR pod %s", podName)
 				}
 
@@ -163,165 +168,4 @@ func collectSNRPodNames() []string {
 	}
 
 	return podNames
-}
-
-func resolveMustGatherImage() string {
-	if envImg := os.Getenv(snrparams.MustGatherImageEnvVar); envImg != "" {
-		GinkgoWriter.Printf("must-gather image resolved from %s env var: %s\n",
-			snrparams.MustGatherImageEnvVar, envImg)
-
-		return envImg
-	}
-
-	GinkgoWriter.Printf("must-gather image using default: %s\n", snrparams.DefaultMustGatherImage)
-
-	return snrparams.DefaultMustGatherImage
-}
-
-func createMustGatherDestDir() string {
-	base := os.Getenv("ARTIFACT_DIR")
-	if base == "" {
-		base = GinkgoT().TempDir()
-	}
-
-	dir, mkdirErr := os.MkdirTemp(base, "snr-must-gather-")
-	ExpectWithOffset(1, mkdirErr).ToNot(HaveOccurred(), "Failed to create must-gather output directory")
-
-	return dir
-}
-
-func runMustGather(ctx context.Context, image, destDir string) {
-	// The default image uses a mutable :latest tag, so log the resolved digest on every run
-	// (best-effort) to keep a floating-tag failure reproducible against the exact build pulled.
-	if digest, digestErr := resolveImageDigest(ctx, image); digestErr != nil {
-		GinkgoWriter.Printf("WARNING: could not resolve must-gather image digest for %q: %v\n", image, digestErr)
-	} else {
-		GinkgoWriter.Printf("Using must-gather image %s (digest %s)\n", image, digest)
-	}
-
-	ocTimeout := fmt.Sprintf("%ds", int(snrparams.MustGatherOCTimeout.Seconds()))
-	cmd := exec.CommandContext(ctx, "oc", "adm", "must-gather",
-		"--image="+image,
-		"--dest-dir="+destDir,
-		"--timeout="+ocTimeout,
-	)
-	env := os.Environ()
-	if os.Getenv("HOME") == "" {
-		env = append(env, "HOME=/tmp")
-	}
-
-	cmd.Env = env
-	output, err := cmd.CombinedOutput()
-	logFile := filepath.Join(destDir, "oc-adm-must-gather.log")
-
-	if writeErr := os.WriteFile(logFile, output, 0o644); writeErr != nil {
-		GinkgoWriter.Printf("Warning: failed to write must-gather log to %s: %v\n", logFile, writeErr)
-	}
-
-	GinkgoWriter.Printf("must-gather output saved to %s\n", logFile)
-
-	if ctx.Err() != nil {
-		Fail(fmt.Sprintf("must-gather timed out after %s:\n%s",
-			snrparams.MustGatherContextTimeout, string(output)), 1)
-	}
-
-	ExpectWithOffset(1, err).ToNot(HaveOccurred(), "must-gather failed:\n%s", string(output))
-}
-
-// resolveImageDigest returns the manifest digest a mutable image reference currently resolves to,
-// so a run using a floating tag (e.g. :latest) can be reproduced against the exact build that was
-// pulled. Best-effort: callers log the error and continue rather than failing the test.
-func resolveImageDigest(ctx context.Context, image string) (string, error) {
-	infoCtx, cancel := context.WithTimeout(ctx, snrparams.MustGatherImageInfoTimeout)
-	defer cancel()
-
-	out, err := exec.CommandContext(infoCtx, "oc", "image", "info", image,
-		"--filter-by-os=linux/amd64", "-o", "json").Output()
-	if err != nil {
-		return "", fmt.Errorf("oc image info %s: %w", image, err)
-	}
-
-	var info struct {
-		Digest string `json:"digest"`
-	}
-	if err := json.Unmarshal(out, &info); err != nil {
-		return "", fmt.Errorf("parsing oc image info output: %w", err)
-	}
-
-	if info.Digest == "" {
-		return "", fmt.Errorf("oc image info returned no digest for %s", image)
-	}
-
-	return info.Digest, nil
-}
-
-func collectRelativePaths(root string) ([]string, error) {
-	var paths []string
-
-	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-
-		rel, relErr := filepath.Rel(root, path)
-		if relErr != nil {
-			return relErr
-		}
-
-		paths = append(paths, filepath.ToSlash(rel))
-
-		return nil
-	})
-
-	return paths, err
-}
-
-func hasMatchingFile(files []string, pattern string) bool {
-	lowerPattern := strings.ToLower(pattern)
-	for _, f := range files {
-		if strings.Contains(strings.ToLower(f), lowerPattern) {
-			return true
-		}
-	}
-
-	return false
-}
-
-func cleanupMustGatherNamespaces(ctx context.Context, testStartTime time.Time) {
-	cleanupCtx, cleanupCancel := context.WithTimeout(ctx, snrparams.MustGatherCleanupTimeout)
-	defer cleanupCancel()
-
-	out, err := exec.CommandContext(cleanupCtx, "oc", "get", "ns",
-		"-l", "openshift.io/run-level",
-		"-o", "jsonpath={range .items[*]}{.metadata.name} {.metadata.creationTimestamp}{\"\\n\"}{end}",
-	).CombinedOutput()
-	if err != nil {
-		GinkgoWriter.Printf("Warning: failed to list namespaces for must-gather cleanup: %v\n", err)
-
-		return
-	}
-
-	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
-		fields := strings.Fields(line)
-		if len(fields) < 1 || !strings.HasPrefix(fields[0], "openshift-must-gather-") {
-			continue
-		}
-
-		namespaceName := fields[0]
-
-		if len(fields) >= 2 {
-			createdAt, parseErr := time.Parse(time.RFC3339, fields[1])
-			if parseErr == nil && createdAt.Before(testStartTime) {
-				continue
-			}
-		}
-
-		GinkgoWriter.Printf("Cleaning up leftover must-gather namespace: %s\n", namespaceName)
-		cleanupOut, cleanupErr := exec.CommandContext(cleanupCtx, "oc", "delete", "ns", namespaceName,
-			"--ignore-not-found", "--wait=false").CombinedOutput()
-		if cleanupErr != nil {
-			GinkgoWriter.Printf("Warning: failed to delete namespace %s: %v\n%s\n",
-				namespaceName, cleanupErr, string(cleanupOut))
-		}
-	}
 }
