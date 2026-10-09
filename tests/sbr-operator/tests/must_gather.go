@@ -60,7 +60,8 @@ var _ = Describe(
 
 				By("Resolving the RHWA must-gather image")
 
-				mustGatherImage := mustgather.ResolveImage(
+				mustGatherImage := mustgather.DiscoverImage(
+					APIClient, medik8sparams.OperatorNs,
 					sbrparams.MustGatherImageEnvVar, sbrparams.DefaultMustGatherImage, GinkgoWriter.Printf)
 				Expect(mustGatherImage).To(ContainSubstring(":"),
 					"must-gather image %q should contain a tag separator", mustGatherImage)
