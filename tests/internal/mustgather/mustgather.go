@@ -57,7 +57,12 @@ type MustGatherExpectation struct {
 func Run(
 	ctx context.Context, image, destDir string, options Options, logf func(format string, args ...interface{}),
 ) error {
-	if digest, digestErr := resolveImageDigest(ctx, image, options.ImageInfoTimeout); digestErr != nil {
+	// A digest-pinned ref already carries its provenance, so log it directly and
+	// skip the client-side `oc image info` lookup, which needs registry creds the
+	// test pod may lack (e.g. registry.redhat.io on downstream builds).
+	if _, digest, found := strings.Cut(image, "@"); found {
+		logf("Using must-gather image %s (digest %s)\n", image, digest)
+	} else if digest, digestErr := resolveImageDigest(ctx, image, options.ImageInfoTimeout); digestErr != nil {
 		logf("WARNING: could not resolve must-gather image digest for %q: %v\n", image, digestErr)
 	} else {
 		logf("Using must-gather image %s (digest %s)\n", image, digest)

@@ -115,6 +115,29 @@ printf '%s\n' "$*" "HOME=$HOME" > "$COMMAND_RECORD"
 	}
 }
 
+func TestRunDigestRefSkipsImageInfo(t *testing.T) {
+	// `oc image info` fails; a digest-pinned ref must still log its digest
+	// from the ref itself rather than falling back to a WARNING.
+	fakeOC(t, `if [ "$1" = image ]; then exit 1; fi
+exit 0
+`)
+	dest := t.TempDir()
+	var logs strings.Builder
+	image := "registry.redhat.io/workload-availability/must-gather@sha256:abc123"
+	if err := Run(context.Background(), image, dest, Options{ImageInfoTimeout: testTimeout},
+		func(format string, args ...interface{}) { fmt.Fprintf(&logs, format, args...) }); err != nil {
+		t.Fatal(err)
+	}
+
+	if strings.Contains(logs.String(), "WARNING") {
+		t.Fatalf("digest ref should not warn: %s", logs.String())
+	}
+
+	if !strings.Contains(logs.String(), "digest sha256:abc123") {
+		t.Fatalf("embedded digest not logged: %s", logs.String())
+	}
+}
+
 func TestRunCanceledContext(t *testing.T) {
 	fakeOC(t, "exit 0\n")
 	ctx, cancel := context.WithCancel(context.Background())
